@@ -1,0 +1,193 @@
+
+.login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #0b0d14;
+  color: #f4f5fb;
+  font-family: Inter, sans-serif;
+}
+
+.login-brand {
+  padding: 42px 9%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background:
+    radial-gradient(ellipse at 20% 30%, #332450 0, transparent 45%),
+    radial-gradient(ellipse at 80% 80%, #202342 0, transparent 40%),
+    #10111b;
+  border-right: 1px solid #292735;
+}
+
+.login-logo, .mobile-logo {
+  font-size: 23px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.login-logo:first-letter, .mobile-logo:first-letter {
+  color: #b8a2ff;
+}
+
+.brand-message {
+  max-width: 460px;
+  margin: 50px auto;
+}
+
+.brand-message .eyebrow, .form-eyebrow {
+  color: #b8a2ff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.8px;
+}
+
+.brand-message h1 {
+  font-size: clamp(32px, 4vw, 52px);
+  line-height: 1.15;
+  letter-spacing: -2px;
+  margin: 20px 0;
+}
+
+.brand-message > p:last-child {
+  color: #aaaabd;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.brand-footer {
+  color: #85869a;
+  font-size: 11px;
+}
+
+.login-form-area {
+  display: grid;
+  place-items: center;
+  padding: 40px 24px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 390px;
+}
+
+.mobile-logo {
+  display: none;
+  margin-bottom: 45px;
+}
+
+.form-eyebrow {
+  margin-bottom: 12px;
+}
+
+.login-form h2 {
+  font-size: 27px;
+  line-height: 1.35;
+  letter-spacing: -0.8px;
+  margin: 0;
+}
+
+.form-subtitle {
+  color: #999bad;
+  font-size: 12px;
+  margin: 12px 0 30px;
+}
+
+.login-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.login-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 12px;
+  color: #e1e1ed;
+}
+
+.login-form input {
+  width: 100%;
+  border: 1px solid #303242;
+  border-radius: 9px;
+  padding: 14px;
+  outline: none;
+  background: #131520;
+  color: white;
+  font-size: 12px;
+}
+
+.login-form input:focus {
+  border-color: #a78bfa;
+  box-shadow: 0 0 0 3px #a78bfa20;
+}
+
+.login-form input::placeholder {
+  color: #6e7185;
+}
+
+.forgot-password {
+  text-align: right;
+  margin-top: -10px;
+}
+
+.forgot-password button, .signup-switch button {
+  color: #b8a2ff;
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  padding: 0;
+}
+
+.login-submit {
+  border: 0;
+  border-radius: 9px;
+  padding: 15px;
+  background: #8058e8;
+  color: white;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.login-submit:hover {
+  background: #946ff4;
+}
+
+.signup-switch {
+  color: #a5a7b8;
+  text-align: center;
+  font-size: 12px;
+  margin-top: 27px;
+}
+
+.signup-switch button {
+  font-weight: 600;
+}
+
+.login-terms {
+  color: #74768a;
+  font-size: 10px;
+  text-align: center;
+  line-height: 1.8;
+  margin-top: 40px;
+}
+
+@media (max-width: 700px) {
+  .login-page {
+    grid-template-columns: 1fr;
+  }
+
+  .login-brand {
+    display: none;
+  }
+
+  .mobile-logo {
+    display: block;
+  }
+
+  .login-form-area {
+    min-height: 100vh;
+    padding: 30px 24px;
+  }
+}
