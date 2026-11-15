@@ -19,20 +19,8 @@ interface Meeting {
   time: string
 }
 
-interface ChatMessage {
-  id: string
-  sender: string
-  message: string
-  time: string
-}
 
-const ICE_SERVERS = {
-  iceServers: [
-    {
-      urls: 'stun:stun.l.google.com:19302'
-    }
-  ]
-}
+
 
 function App() {
   const navigate = useNavigate()
@@ -40,17 +28,10 @@ function App() {
 
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null)
-  const [participantName, setParticipantName] = useState('')
   const [micOn, setMicOn] = useState(true)
-  const [remoteStreams, setRemoteStreams] = useState<
-  { socketId: string; participantName: string; stream: MediaStream }[]
->([])
 const [cameraOn, setCameraOn] = useState(true)
 const videoRef = useRef<HTMLVideoElement | null>(null)
 const streamRef = useRef<MediaStream | null>(null)
-const peersRef = useRef<Map<string, RTCPeerConnection>>(new Map())
-const participantNamesRef = useRef<Map<string, string>>(new Map())
-const socketRef = useRef<Socket | null>(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [date, setDate] = useState('')
@@ -62,7 +43,7 @@ const [deleteMessage, setDeleteMessage] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [message, setMessage] = useState('')
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  
 
   const [selectedProject, setSelectedProject] = useState('')
 const [showProjectDetails, setShowProjectDetails] = useState(false)
@@ -360,73 +341,9 @@ const handleJoinMeeting = (meeting: Meeting) => {
   })
 }
 
-const createPeer = (remoteId: string) => {
-  const existingPeer = peersRef.current.get(remoteId)
-  if (existingPeer) return existingPeer
 
-  const peer = new RTCPeerConnection(ICE_SERVERS)
-  const stream = streamRef.current
 
-  if (stream) {
-    stream.getTracks().forEach((track) => {
-      peer.addTrack(track, stream)
-    })
-  }
 
-  peer.ontrack = (event) => {
-    const remoteStream = event.streams[0]
-    if (!remoteStream) return
-
-    const participantName =
-      participantNamesRef.current.get(remoteId) || 'Participant'
-
-    setRemoteStreams((previous) => {
-      const existing = previous.find(item => item.socketId === remoteId)
-
-      if (existing) {
-        return previous.map(item =>
-          item.socketId === remoteId
-            ? { ...item, stream: remoteStream }
-            : item
-        )
-      }
-
-      return [...previous, {
-        socketId: remoteId,
-        participantName,
-        stream: remoteStream
-      }]
-    })
-  }
-
-  peer.onicecandidate = (event) => {
-    if (event.candidate) {
-      socketRef.current?.emit('webrtc-ice-candidate', {
-        to: remoteId,
-        candidate: event.candidate
-      })
-    }
-  }
-
-  peersRef.current.set(remoteId, peer)
-  return peer
-}
-
-const sendOffer = async (remoteId: string) => {
-  const peer = createPeer(remoteId)
-
-  try {
-    const offer = await peer.createOffer()
-    await peer.setLocalDescription(offer)
-
-    socketRef.current?.emit('webrtc-offer', {
-      to: remoteId,
-      offer
-    })
-  } catch (error) {
-    console.error('Error sending WebRTC offer:', error)
-  }
-}
 
 const startCamera = async () => {
   try {

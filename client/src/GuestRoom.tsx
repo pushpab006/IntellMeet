@@ -1,6 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react'
-import { useLocation, useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { io, type Socket } from 'socket.io-client'
 import {
   Video, VideoOff, Mic, MicOff, PhoneOff, Users,
@@ -45,7 +45,6 @@ function RemoteVideo({ stream }: { stream: MediaStream }) {
 
 function GuestRoom() {
   const { meetingId } = useParams()
-  const location = useLocation()
   const navigate = useNavigate()
   const storedUser = localStorage.getItem('intellmeetUser')
 
