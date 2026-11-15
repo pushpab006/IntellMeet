@@ -30,7 +30,7 @@ function GuestMeeting() {
 
     setConnectionStatus('Connecting...')
 
-    const socket = io('http://localhost:5000')
+    const socket = io('https://intellmeet-ca8e.onrender.com')
     socketRef.current = socket
 
    socket.emit('join-meeting', {

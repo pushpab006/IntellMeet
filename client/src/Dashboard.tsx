@@ -227,7 +227,7 @@ useEffect(() => {
 useEffect(() => {
   if (activeTab !== 'Team Chat') return
 
-  const socket = io('http://localhost:5000')
+  const socket = io('https://intellmeet-ca8e.onrender.com')
 
   setTeamSocket(socket)
 
