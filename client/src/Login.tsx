@@ -41,6 +41,8 @@ const navigate = useNavigate()
         : { email, password }
 
       const response = await api.post(endpoint, payload)
+      console.log('LOGIN RESPONSE:', response.data)
+console.log('LOGIN TOKEN:', response.data.token)
 
      if (!isSignup && response.data.token) {
   localStorage.setItem('intellmeetToken', response.data.token)

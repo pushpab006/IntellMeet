@@ -30,46 +30,53 @@ function ProtectedGuestRoute({ children }: { children: ReactNode }) {
   return <>{children}</>
 }
 
-function App() {
+function AppRoutes() {
+  const location = useLocation()
   const isLoggedIn = Boolean(localStorage.getItem('intellmeetToken'))
 
   return (
+    <Routes location={location}>
+      <Route
+        path="/guest-meeting/:meetingId"
+        element={
+          <ProtectedGuestRoute>
+            <GuestMeeting />
+          </ProtectedGuestRoute>
+        }
+      />
+
+      <Route
+        path="/guest-room/:meetingId"
+        element={
+          <ProtectedGuestRoute>
+            <GuestRoom />
+          </ProtectedGuestRoute>
+        }
+      />
+
+      <Route
+        path="/"
+        element={
+          isLoggedIn ? <Dashboard /> : <Navigate to="/login" replace />
+        }
+      />
+
+      <Route
+        path="/login"
+        element={
+          isLoggedIn ? <Navigate to="/" replace /> : <Login />
+        }
+      />
+
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  )
+}
+
+function App() {
+  return (
     <BrowserRouter>
-      <Routes>
-        <Route
-          path="/guest-meeting/:meetingId"
-          element={
-            <ProtectedGuestRoute>
-              <GuestMeeting />
-            </ProtectedGuestRoute>
-          }
-        />
-
-        <Route
-          path="/guest-room/:meetingId"
-          element={
-            <ProtectedGuestRoute>
-              <GuestRoom />
-            </ProtectedGuestRoute>
-          }
-        />
-
-        <Route
-          path="/"
-          element={
-            isLoggedIn ? <Dashboard /> : <Navigate to="/login" replace />
-          }
-        />
-
-        <Route
-          path="/login"
-          element={
-            isLoggedIn ? <Navigate to="/" replace /> : <Login />
-          }
-        />
-
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AppRoutes />
     </BrowserRouter>
   )
 }
