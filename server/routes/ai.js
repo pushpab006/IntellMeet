@@ -62,16 +62,40 @@ router.post('/summarize/:meetingId', verifyToken, async (req, res) => {
 
   const result = await client.chat.completions.create({
   model: 'qwen/qwen3.8-27b',
-  messages: [
-    {
-      role: 'system',
-      content: 'You are an AI meeting assistant. Summarize the meeting clearly and list important action items.'
-    },
-    {
-      role: 'user',
-      content: `Summarize this meeting transcript. Include key points, decisions, and action items:\n\n${transcript}`
-    }
-  ],
+ 
+messages: [
+  {
+    role: 'system',
+    content: `You are a professional AI meeting assistant.
+Analyze meeting transcripts and create clear, structured summaries.
+
+Always use these five sections:
+
+1. MEETING OVERVIEW
+Write a short explanation of the meeting.
+
+2. KEY DISCUSSION POINTS
+List the important topics discussed.
+
+3. IMPORTANT DECISIONS
+List the decisions made during the meeting.
+
+4. ACTION ITEMS
+List the tasks that need to be completed.
+
+5. ASSIGNED TASKS
+Mention each person's name and their assigned task.
+
+Use bullet points where appropriate.
+If information is not available, write "Not specified".
+Do not invent names, decisions, or tasks.`
+  },
+  {
+    role: 'user',
+    content: `Analyze this meeting transcript and generate the structured summary:\n\n${transcript}`
+  }
+],
+
   max_tokens: 800
 });
 

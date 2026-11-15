@@ -47,7 +47,11 @@ function GuestRoom() {
   const { meetingId } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
-  const participantName = location.state?.participantName || 'Guest'
+  const storedUser = localStorage.getItem('intellmeetUser')
+
+const participantName = storedUser
+  ? JSON.parse(storedUser).fullName || 'Registered User'
+  : 'Registered User'
 
   const socketRef = useRef<Socket | null>(null)
   const streamRef = useRef<MediaStream | null>(null)

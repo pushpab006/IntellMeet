@@ -64,6 +64,18 @@ const [deleteMessage, setDeleteMessage] = useState('')
   const [message, setMessage] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
 
+  const [selectedProject, setSelectedProject] = useState('')
+const [showProjectDetails, setShowProjectDetails] = useState(false)
+
+const [teamMessages, setTeamMessages] = useState<any[]>([])
+const [teamMessage, setTeamMessage] = useState('')
+const [teamSocket, setTeamSocket] = useState<Socket | null>(null)
+
+  const [selectedMeetingId, setSelectedMeetingId] = useState('')
+const [transcript, setTranscript] = useState('')
+const [aiSummary, setAiSummary] = useState('')
+const [aiLoading, setAiLoading] = useState(false)
+
   const upcomingMeetings = meetings
   .filter((meeting) => {
     const meetingDateTime = new Date(
@@ -84,38 +96,164 @@ const [deleteMessage, setDeleteMessage] = useState('')
     .join('')
     .toUpperCase()
 
-  // Load meetings from MongoDB
-  const fetchMeetings = async () => {
+    
+
+
+// Generate AI meeting summary
+const generateAISummary = async () => {
+  if (!selectedMeetingId) {
+    alert('Please select a meeting.')
+    return
+  }
+
+  if (!transcript.trim()) {
+    alert('Please enter the meeting transcript.')
+    return
+  }
+
+  try {
+    setAiLoading(true)
+    setAiSummary('')
+
     const token = localStorage.getItem('intellmeetToken')
 
-    if (!token) {
-      window.location.href = '/login'
-      return
-    }
-
-    try {
-      setLoading(true)
-      setError('')
-
-      const response = await api.get('/api/meetings', {
+    const response = await api.post(
+      `/api/ai/summarize/${selectedMeetingId}`,
+      { transcript },
+      {
         headers: {
           Authorization: `Bearer ${token}`
         }
-      })
+      }
+    )
 
-      setMeetings(response.data.meetings || [])
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Unable to load meetings.')
-    } finally {
-      setLoading(false)
-    }
+    setAiSummary(response.data.summary)
+  } catch (error: any) {
+    console.error('AI summary error:', error)
+    alert(
+      error.response?.data?.message ||
+      'Unable to generate AI summary.'
+    )
+  } finally {
+    setAiLoading(false)
+  }
+}
+
+
+// Send Team Chat message
+const sendTeamMessage = () => {
+  if (!teamMessage.trim()) return
+
+  if (!teamSocket?.connected) {
+    alert('Team Chat is not connected. Please try again.')
+    return
   }
 
-  useEffect(() => {
-    if (activeTab === 'My Meetings') {
-      fetchMeetings()
-    }
-  }, [activeTab])
+  teamSocket.emit('team-chat-message', {
+    message: teamMessage
+  })
+
+  setTeamMessage('')
+}
+
+
+
+// Copy AI summary
+const copyAISummary = async () => {
+  try {
+    await navigator.clipboard.writeText(aiSummary)
+    alert('AI summary copied successfully!')
+  } catch (error) {
+    alert('Unable to copy summary.')
+  }
+}
+
+// Download AI summary
+const downloadAISummary = () => {
+  const blob = new Blob([aiSummary], {
+    type: 'text/plain;charset=utf-8'
+  })
+
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+
+  link.href = url
+  link.download = 'IntellMeet-AI-Summary.txt'
+  link.click()
+
+  URL.revokeObjectURL(url)
+}
+
+
+// Load meetings from MongoDB
+const fetchMeetings = async () => {
+  const token = localStorage.getItem('intellmeetToken')
+
+  if (!token) {
+    window.location.href = '/login'
+    return
+  }
+
+  try {
+    setLoading(true)
+    setError('')
+
+    const response = await api.get('/api/meetings', {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    })
+
+    setMeetings(response.data.meetings || [])
+  } catch (err: any) {
+    setError(err.response?.data?.message || 'Unable to load meetings.')
+  } finally {
+    setLoading(false)
+  }
+}
+
+useEffect(() => {
+  if (
+    activeTab === 'My Meetings' ||
+    activeTab === 'AI Summaries' ||
+    activeTab === 'Analytics'
+  ) {
+    fetchMeetings()
+  }
+}, [activeTab])
+
+
+// Connect to workspace Team Chat
+useEffect(() => {
+  if (activeTab !== 'Team Chat') return
+
+  const socket = io('http://localhost:5000')
+
+  setTeamSocket(socket)
+
+  socket.on('connect', () => {
+    socket.emit('join-team-chat', {
+      participantName: user.fullName || 'Team Member'
+    })
+
+    console.log('Connected to Team Chat')
+  })
+
+  socket.on('team-chat-message', (newMessage) => {
+    setTeamMessages((previousMessages) => [
+      ...previousMessages,
+      newMessage
+    ])
+  })
+
+  return () => {
+    socket.off('team-chat-message')
+    socket.disconnect()
+    setTeamSocket(null)
+  }
+}, [activeTab, user.fullName])
+
+
 
   
 // Create or update a meeting
@@ -215,123 +353,11 @@ const handleDeleteMeeting = async (id: string) => {
 }
 
 const handleJoinMeeting = (meeting: Meeting) => {
-  setSelectedMeeting(meeting)
-  setActiveTab('Meeting Room')
-
-  const socket = io('http://localhost:5000')
-  socketRef.current = socket
-
-  socket.on('connect', () => {
-    socket.emit('join-meeting', {
-      meetingId: meeting._id,
+  navigate(`/guest-room/${meeting._id}`, {
+    state: {
       participantName: user.fullName || 'Host'
-    })
-
-    console.log('Host joined meeting:', meeting._id)
+    }
   })
-
-  socket.on('connect_error', (error) => {
-    console.error('Host connection error:', error)
-    alert('Could not connect to meeting server.')
-  })
-
-  socket.on('chat-message', (data: ChatMessage) => {
-  setMessages((previous) => [...previous, data])
-})
-
-socket.on('existing-participants', (participants) => {
-  participants.forEach((person: {
-    socketId: string
-    participantName: string
-  }) => {
-    participantNamesRef.current.set(
-      person.socketId,
-      person.participantName
-    )
-
-    void sendOffer(person.socketId)
-  })
-})
-
-socket.on('participant-joined', (person: {
-  socketId: string
-  participantName: string
-}) => {
-  participantNamesRef.current.set(
-    person.socketId,
-    person.participantName
-  )
-
-  void sendOffer(person.socketId)
-})
-
-socket.on('webrtc-offer', async ({ from, offer }) => {
-  try {
-    const peer = createPeer(from)
-
-    await peer.setRemoteDescription(
-      new RTCSessionDescription(offer)
-    )
-
-    const answer = await peer.createAnswer()
-    await peer.setLocalDescription(answer)
-
-    socketRef.current?.emit('webrtc-answer', {
-      to: from,
-      answer
-    })
-  } catch (error) {
-    console.error('Error answering WebRTC offer:', error)
-  }
-})
-
-socket.on('webrtc-answer', async ({ from, answer }) => {
-  try {
-    const peer = peersRef.current.get(from)
-
-    if (!peer) return
-
-    await peer.setRemoteDescription(
-      new RTCSessionDescription(answer)
-    )
-  } catch (error) {
-    console.error('Error receiving WebRTC answer:', error)
-  }
-})
-
-socket.on('participant-left', ({ socketId }) => {
-  const peer = peersRef.current.get(socketId)
-
-  if (peer) {
-    peer.close()
-    peersRef.current.delete(socketId)
-  }
-
-  participantNamesRef.current.delete(socketId)
-
-  setRemoteStreams((previous) =>
-    previous.filter(item => item.socketId !== socketId)
-  )
-})
-
-socket.on('webrtc-ice-candidate', async ({ from, candidate }) => {
-
-  try {
-    const peer = peersRef.current.get(from)
-
-    if (!peer) return
-
-    await peer.addIceCandidate(
-      new RTCIceCandidate(candidate)
-    )
-  } catch (error) {
-    console.error('Error adding ICE candidate:', error)
-  }
-})
-
-
-
-  
 }
 
 const createPeer = (remoteId: string) => {
@@ -464,15 +490,17 @@ return (
 
         <p className="menu-label">WORKSPACE</p>
 
-        {['Overview', 'My Meetings', 'AI Summaries', 'Team Chat', 'Projects', 'Analytics'].map((item) => (
-          <button
-            key={item}
-            className={`nav-item ${activeTab === item ? 'active' : ''}`}
-            onClick={() => setActiveTab(item)}
-          >
-            {item}
-          </button>
-        ))}
+        <nav className="sidebar-nav">
+  {['Overview', 'My Meetings', 'AI Summaries', 'Team Chat', 'Projects', 'Analytics'].map((item) => (
+    <button
+      key={item}
+      className={`nav-item ${activeTab === item ? 'active' : ''}`}
+      onClick={() => setActiveTab(item)}
+    >
+      {item}
+    </button>
+  ))}
+</nav>
 
         <div className="profile">
           <div className="avatar">{initials}</div>
@@ -752,7 +780,7 @@ return (
                       </p>
                     </div>
 
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <div className="meeting-actions">
   <button
   className="primary-button"
   onClick={() => handleJoinMeeting(meeting)}
@@ -879,30 +907,454 @@ return (
   </section>
 )}
 
-        {activeTab === 'AI Summaries' && (
+       {activeTab === 'AI Summaries' && (
   <section style={{ padding: '30px 0' }}>
-    <h1>AI Meeting Summaries</h1>
-    <p>Review your meeting summaries and key discussion points.</p>
+    <div className="welcome">
+      <div>
+        <p className="eyebrow">POWERED BY GROQ AI</p>
+        <h1>AI Meeting Summaries</h1>
+        <p className="subtitle">
+          Generate meeting summaries, key decisions and action items.
+        </p>
+      </div>
+    </div>
 
-    <div className="panel" style={{ marginTop: '20px' }}>
-      <h2>No AI summaries yet</h2>
+    <article className="panel" style={{ marginTop: '20px' }}>
+      <h2>Select Meeting</h2>
+
+      <select
+        value={selectedMeetingId}
+        onChange={(e) => setSelectedMeetingId(e.target.value)}
+        style={inputStyle}
+      >
+        <option value="">Choose a meeting</option>
+        {meetings.map((meeting) => (
+          <option key={meeting._id} value={meeting._id}>
+            {meeting.title}
+          </option>
+        ))}
+      </select>
+
+      <h2 style={{ marginTop: '25px' }}>Meeting Transcript</h2>
+
+      <textarea
+        value={transcript}
+        onChange={(e) => setTranscript(e.target.value)}
+        placeholder="Paste your meeting transcript here..."
+        rows={10}
+        style={{
+          ...inputStyle,
+          resize: 'vertical',
+          lineHeight: '1.6'
+        }}
+      />
+
+      <button
+        className="primary-button"
+        onClick={generateAISummary}
+        disabled={aiLoading}
+        style={{ marginTop: '20px' }}
+      >
+        {aiLoading ? 'Generating Summary...' : '✦ Generate AI Summary'}
+      </button>
+    </article>
+
+    {aiSummary && (
+      <article className="panel" style={{ marginTop: '25px' }}>
+        <p className="eyebrow">GENERATED BY GROQ AI</p>
+        <h2>Meeting Summary</h2>
+
+
+<div style={{
+  display: 'flex',
+  gap: '12px',
+  flexWrap: 'wrap',
+  marginTop: '15px',
+  marginBottom: '15px'
+}}>
+  <button
+    className="primary-button"
+    onClick={copyAISummary}
+  >
+    📋 Copy Summary
+  </button>
+
+  <button
+    className="primary-button"
+    onClick={downloadAISummary}
+  >
+    ⬇ Download Summary
+  </button>
+</div>
+
+
+       
+<div style={{
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+  gap: '18px',
+  marginTop: '20px'
+}}>
+  {aiSummary
+    .split(/(?=^(?:\d+\.\s*)?(?:MEETING OVERVIEW|KEY DISCUSSION POINTS|IMPORTANT DECISIONS|ACTION ITEMS|ASSIGNED TASKS)\s*:?\s*$)/gim)
+    .filter(section => section.trim())
+    .map((section, index) => {
+      const lines = section.trim().split('\n')
+      const heading = lines.shift()?.replace(/^\d+\.\s*/, '').replace(/\*\*/g, '').replace(/:$/, '').trim()
+
+      const icons = ['📋', '💬', '🎯', '✅', '👥']
+
+      return (
+        <div
+          key={index}
+          style={{
+           background: '#ffffff',
+color: '#1f2937',
+            border: '1px solid var(--border-color, #e5e7eb)',
+            borderRadius: '14px',
+            padding: '22px',
+            minHeight: '150px'
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: '15px',color: '#111827', }}>
+            {icons[index] || '📌'} {heading || `Section ${index + 1}`}
+          </h3>
+
+          <div style={{
+  whiteSpace: 'pre-wrap',
+  lineHeight: '1.8',
+  color: '#374151',
+  maxHeight: '220px',
+  overflowY: 'auto',
+  overflowX: 'hidden',
+  paddingRight: '8px'
+}}>
+            {lines.join('\n').replace(/\*\*/g, '').trim()}
+          </div>
+        </div>
+      )
+    })}
+</div>
+
+      </article>
+    )}
+  </section>
+)}
+
+
+{activeTab === 'Team Chat' && (
+  <section style={{ padding: '30px 0' }}>
+    <div className="welcome">
+      <div>
+        <p className="eyebrow">TEAM WORKSPACE</p>
+        <h1>Team Chat 💬</h1>
+        <p className="subtitle">
+          Connect and collaborate with your team in real time.
+        </p>
+      </div>
+    </div>
+
+    <article className="panel" style={{
+      marginTop: '20px',
+      height: '550px',
+      display: 'flex',
+      flexDirection: 'column'
+    }}>
+      <div style={{
+        borderBottom: '1px solid #e5e7eb',
+        paddingBottom: '15px'
+      }}>
+        <h2>Workspace Messages</h2>
+        <p style={{ color: '#64748b' }}>
+          {teamSocket?.connected ? '🟢 Connected' : 'Connecting...'}
+        </p>
+      </div>
+
+      <div style={{
+        flex: 1,
+        overflowY: 'auto',
+        padding: '15px 0'
+      }}>
+        {teamMessages.length === 0 ? (
+          <p style={{
+            textAlign: 'center',
+            color: '#64748b',
+            marginTop: '100px'
+          }}>
+            No messages yet. Start the conversation!
+          </p>
+        ) : (
+          teamMessages.map((msg, index) => (
+            <div key={msg.id || index} style={{
+              background: '#f1f5f9',
+              color: '#1e293b',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              marginBottom: '12px'
+            }}>
+              <strong>{msg.sender}</strong>
+
+              <p style={{
+                margin: '8px 0',
+                whiteSpace: 'pre-wrap'
+              }}>
+                {msg.message}
+              </p>
+
+              <small style={{ color: '#64748b' }}>
+                {new Date(msg.timestamp).toLocaleTimeString()}
+              </small>
+            </div>
+          ))
+        )}
+      </div>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          sendTeamMessage()
+        }}
+        style={{
+          display: 'flex',
+          gap: '10px',
+          borderTop: '1px solid #e5e7eb',
+          paddingTop: '15px'
+        }}
+      >
+        <input
+          type="text"
+          value={teamMessage}
+          onChange={(e) => setTeamMessage(e.target.value)}
+          placeholder="Type your team message..."
+          style={{ ...inputStyle, flex: 1 }}
+        />
+
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={!teamSocket?.connected || !teamMessage.trim()}
+        >
+          Send ➤
+        </button>
+      </form>
+    </article>
+  </section>
+)}
+
+
+
+
+{activeTab === 'Projects' && (
+  <section style={{ padding: '30px 0', textAlign: 'left' }}>
+    <div style={{ marginBottom: '30px' }}>
+      <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>
+        My Projects
+      </h1>
+      <p style={{ color: '#94a3b8', margin: 0 }}>
+        Manage and explore your team projects.
+      </p>
+    </div>
+
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+      gap: '22px'
+    }}>
+      <div className="project-card">
+        <h2>IntellMeet</h2>
+        <p>AI-Powered Enterprise Meeting & Collaboration Platform</p>
+        <p><strong>Technology</strong></p>
+        <p>React · TypeScript · Node.js · MongoDB · Socket.IO · Groq AI</p>
+        <span className="status-badge">In Progress</span>
+        <div>
+          <button onClick={() => {
+            setSelectedProject('IntellMeet')
+            setShowProjectDetails(true)
+          }}>
+            View Details
+          </button>
+        </div>
+      </div>
+
+      <div className="project-card">
+        <h2>Project LOOP</h2>
+        <p>AI Customer Feedback Intelligence Platform</p>
+        <p><strong>Technology</strong></p>
+        <p>AI · Web Development</p>
+        <span className="status-badge">Completed</span>
+        <div>
+          <button onClick={() => {
+            setSelectedProject('Project LOOP')
+            setShowProjectDetails(true)
+          }}>
+            View Details
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {showProjectDetails && (
+      <div className="project-details">
+        <button
+          onClick={() => setShowProjectDetails(false)}
+          style={{ float: 'right' }}
+        >
+          Close
+        </button>
+
+        {selectedProject === 'IntellMeet' ? (
+          <>
+            <h2>IntellMeet - Project Details</h2>
+            <p>AI-powered enterprise meeting and collaboration platform.</p>
+            <h3>Features</h3>
+            <ul>
+              <li>User authentication</li>
+              <li>Live meetings and video communication</li>
+              <li>Real-time meeting chat</li>
+              <li>AI meeting summaries using Groq</li>
+            </ul>
+            <p><strong>Technologies:</strong> React, TypeScript, Node.js, Express.js, MongoDB, Socket.IO, Groq AI</p>
+            <p><strong>Status:</strong> In Progress</p>
+          </>
+        ) : (
+          <>
+            <h2>Project LOOP - Project Details</h2>
+            <p>AI Customer Feedback Intelligence Platform.</p>
+            <h3>Purpose</h3>
+            <p>Analyze customer feedback from support tickets, app reviews, surveys, and sales-call text.</p>
+            <h3>Features</h3>
+            <ul>
+              <li>Customer feedback analysis</li>
+              <li>AI-based feedback categorization</li>
+              <li>Feedback summaries for product teams</li>
+            </ul>
+            <p><strong>Status:</strong> Completed</p>
+          </>
+        )}
+      </div>
+    )}
+  </section>
+)}
+
+
+
+
+{activeTab === 'Analytics' && (
+  <section style={{ padding: '30px 0', textAlign: 'left' }}>
+    <div style={{ marginBottom: '30px' }}>
+      <h1 style={{ fontSize: '28px', marginBottom: '8px' }}>
+        Analytics Dashboard
+      </h1>
+      <p style={{ color: '#94a3b8' }}>
+        Overview of your meeting activity and projects.
+      </p>
+    </div>
+
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+      gap: '20px'
+    }}>
+      <div className="project-card">
+        <h3>Total Meetings</h3>
+        <h1>{meetings.length}</h1>
+        <p>All scheduled meetings</p>
+      </div>
+
+      <div className="project-card">
+        <h3>Upcoming Meetings</h3>
+        <h1>
+          {meetings.filter(m => new Date(m.date) >= new Date(new Date().toDateString())).length}
+        </h1>
+        <p>Meetings scheduled for today or later</p>
+      </div>
+
+      <div className="project-card">
+        <h3>Past Meetings</h3>
+        <h1>
+          {meetings.filter(m => new Date(m.date) < new Date(new Date().toDateString())).length}
+        </h1>
+        <p>Meetings before today</p>
+      </div>
+
+      <div className="project-card">
+        <h3>Total Projects</h3>
+        <h1>2</h1>
+        <p>IntellMeet and Project LOOP</p>
+      </div>
+    </div>
+
+    <div className="project-details" style={{ marginTop: '25px' }}>
+  <h2>Meeting Activity Chart</h2>
+
+  {[
+    {
+      label: 'Total Meetings',
+      count: meetings.length,
+      color: '#6366f1'
+    },
+    {
+      label: 'Past Meetings',
+      count: meetings.filter(m =>
+        new Date(m.date) < new Date(new Date().toDateString())
+      ).length,
+      color: '#f59e0b'
+    },
+    {
+      label: 'Upcoming Meetings',
+      count: meetings.filter(m =>
+        new Date(m.date) >= new Date(new Date().toDateString())
+      ).length,
+      color: '#10b981'
+    }
+  ].map((item) => (
+    <div key={item.label} style={{ marginBottom: '22px' }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        marginBottom: '8px'
+      }}>
+        <strong>{item.label}</strong>
+        <strong>{item.count}</strong>
+      </div>
+
+      <div style={{
+        width: '100%',
+        height: '12px',
+        background: '#334155',
+        borderRadius: '10px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          width: `${meetings.length ? (item.count / meetings.length) * 100 : 0}%`,
+          height: '100%',
+          background: item.color,
+          borderRadius: '10px'
+        }} />
+      </div>
+    </div>
+  ))}
+</div>
+
+    <div className="project-details" style={{ marginTop: '25px' }}>
+      <h2>Meeting Overview</h2>
+      <p>Total scheduled meetings: {meetings.length}</p>
       <p>
-        Your meeting summaries will appear here after AI processing
-        is implemented.
+        Upcoming: {
+          meetings.filter(m => new Date(m.date) >= new Date(new Date().toDateString())).length
+        }
+      </p>
+      <p>
+        Past: {
+          meetings.filter(m => new Date(m.date) < new Date(new Date().toDateString())).length
+        }
       </p>
     </div>
   </section>
 )}
 
-{activeTab !== 'Overview' &&
-  activeTab !== 'My Meetings' &&
-  activeTab !== 'Meeting Room' &&
-  activeTab !== 'AI Summaries' && (
-    <section style={{ padding: '30px 0' }}>
-      <h1>{activeTab}</h1>
-      <p>This section is coming soon.</p>
-    </section>
-  )}
+
+
 
         <footer>IntellMeet · One workspace, smarter collaboration.</footer>
       </main>

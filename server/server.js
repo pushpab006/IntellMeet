@@ -118,6 +118,33 @@ socket.on('webrtc-ice-candidate', ({ to, candidate }) => {
     leaveMeeting(socket);
   });
 
+  
+  // Join workspace-wide Team Chat
+  socket.on('join-team-chat', ({ participantName }) => {
+    if (!participantName) return;
+
+    socket.join('team-chat');
+    socket.data.teamChatName = participantName;
+
+    console.log(`${participantName} joined Team Chat`);
+  });
+
+  // Send Team Chat message
+  socket.on('team-chat-message', ({ message }) => {
+    if (!socket.rooms.has('team-chat')) return;
+    if (!message || !message.trim()) return;
+
+    const chatMessage = {
+      id: `${Date.now()}-${socket.id}`,
+      sender: socket.data.teamChatName || 'Team Member',
+      message: message.trim(),
+      timestamp: new Date().toISOString()
+    };
+
+    io.to('team-chat').emit('team-chat-message', chatMessage);
+  });
+
+
   socket.on('disconnect', () => {
     leaveMeeting(socket);
     console.log('Participant disconnected:', socket.id);

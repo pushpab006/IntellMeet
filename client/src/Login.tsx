@@ -1,10 +1,14 @@
 
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './Login.css'
 import api from './api'
 
 
+
 function Login() {
+  const location = useLocation()
+const navigate = useNavigate()
   const [isSignup, setIsSignup] = useState(false)
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
@@ -53,7 +57,13 @@ if (isSignup) {
   setPassword('')
 } else {
   console.log('Logged-in user:', response.data.user)
-window.location.href = '/'
+const from = location.state?.from
+
+const destination = from
+  ? `${from.pathname}${from.search || ''}${from.hash || ''}`
+  : '/'
+
+navigate(destination, { replace: true })
 }
     } catch (error: any) {
       alert(
